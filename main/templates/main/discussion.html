@@ -1,0 +1,23 @@
+<!-- main/templates/main/discussion.html -->
+{% extends 'main/base.html' %}
+{% block content %}
+<h2 class="text-center">مناقشتنا الخاصة</h2>
+<form method="post">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button type="submit" class="btn btn-love w-100">إرسال الرسالة</button>
+</form>
+<hr>
+<h3 class="text-center">رسائلنا</h3>
+{% for message in messages %}
+<div class="card mb-2">
+    <div class="card-body">
+        <h5 class="card-title">{{ message.sender.username }}</h5>
+        <p class="card-text">{{ message.content }}</p>
+        <p class="card-text"><small class="text-muted">{{ message.timestamp }}</small></p>
+    </div>
+</div>
+{% empty %}
+<p class="text-center">لا توجد رسائل بعد. ابدأ المحادثة!</p>
+{% endfor %}
+{% endblock %}
