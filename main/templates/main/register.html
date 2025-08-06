@@ -1,11 +1,57 @@
-<!-- main/templates/main/register.html -->
 {% extends 'main/base.html' %}
 {% block content %}
-<h2>إنشاء حساب</h2>
-<form method="post">
-    {% csrf_token %}
-    {{ form.as_p }}
-    <button type="submit" class="btn btn-love">إنشاء الحساب</button>
-</form>
-<p class="mt-3">لديك حساب بالفعل؟ <a href="{% url 'login' %}">تسجيل الدخول هنا</a>.</p>
+
+<div class="d-flex justify-content-center align-items-center" style="min-height: 80vh;">
+    <div class="card shadow-lg p-4" style="max-width: 450px; width: 100%; border-radius: 20px; 
+        background: linear-gradient(43deg, #4158D0 0%, #C850C0 46%, #FFCC70 100%);">
+        <div class="text-center mb-4">
+            <i class="fas fa-user-plus fa-3x text-white mb-3"></i>
+            <h2 class="fw-bold text-white">إنشاء حساب جديد</h2>
+            <p class="text-light">انضم إلينا وابدأ رحلتك الآن ❤️</p>
+        </div>
+
+        <form method="post" class="text-end">
+            {% csrf_token %}
+            
+            <!-- Username -->
+            <div class="mb-3">
+                <label for="id_username" class="form-label text-white fw-semibold">اسم المستخدم</label>
+                <input type="text" name="username" id="id_username" 
+                       class="form-control shadow-sm" placeholder="أدخل اسم المستخدم" required>
+            </div>
+
+            <!-- Email -->
+            <div class="mb-3">
+                <label for="id_email" class="form-label text-white fw-semibold">البريد الإلكتروني</label>
+                <input type="email" name="email" id="id_email" 
+                       class="form-control shadow-sm" placeholder="example@email.com" required>
+            </div>
+
+            <!-- Password -->
+            <div class="mb-3">
+                <label for="id_password1" class="form-label text-white fw-semibold">كلمة المرور</label>
+                <input type="password" name="password1" id="id_password1" 
+                       class="form-control shadow-sm" placeholder="••••••••" required>
+            </div>
+
+            <!-- Confirm Password -->
+            <div class="mb-4">
+                <label for="id_password2" class="form-label text-white fw-semibold">تأكيد كلمة المرور</label>
+                <input type="password" name="password2" id="id_password2" 
+                       class="form-control shadow-sm" placeholder="••••••••" required>
+            </div>
+
+            <button type="submit" class="btn btn-light w-100 py-2 fw-bold" 
+                    style="border-radius: 10px; color: #6a0dad;">
+                <i class="fas fa-user-plus me-2"></i> إنشاء الحساب
+            </button>
+        </form>
+
+        <p class="mt-3 text-center text-white">
+            لديك حساب بالفعل؟
+            <a href="{% url 'login' %}" class="text-white fw-bold text-decoration-underline">تسجيل الدخول هنا</a>
+        </p>
+    </div>
+</div>
+
 {% endblock %}

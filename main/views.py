@@ -91,31 +91,40 @@ def start_discussion(request, user_id):
     
     return redirect('discussion_detail', discussion_id=discussion.id)
 
-
 @login_required
 def discussion_detail(request, discussion_id):
     discussion = get_object_or_404(Discussion, id=discussion_id, participants=request.user)
     messages = discussion.messages.order_by('timestamp')
+    other_participant = discussion.get_other_participant(request.user)
 
     if request.method == 'POST':
-        content = request.POST.get('content')
-        image = request.FILES.get('image')
-        Message.objects.create(
-            discussion=discussion,
-            sender=request.user,
-            content=content,
-            image=image
-        )
-        return redirect('discussion_detail', discussion_id=discussion_id)
+        form = MessageForm(request.POST, request.FILES)
+        if form.is_valid():
+            Message.objects.create(
+                discussion=discussion,
+                sender=request.user,
+                content=form.cleaned_data['content'],
+                image=form.cleaned_data['image']
+            )
+            return redirect('discussion_detail', discussion_id=discussion_id)
+    else:
+        form = MessageForm()
 
     return render(request, 'main/discussion_detail.html', {
         'discussion': discussion,
-        'messages': messages
+        'messages': messages,
+        'other_participant': other_participant,
+        'form': form
     })
-
-
 @login_required
 def discussion_list(request):
+    # Handle search query
+    query = request.GET.get('q', '')
+    users = []
+    if query:
+        users = User.objects.filter(username__icontains=query).exclude(id=request.user.id)
+
+    # Fetch discussions
     discussions = Discussion.objects.filter(participants=request.user).prefetch_related('participants')
     discussion_data = []
     for discussion in discussions:
@@ -124,9 +133,34 @@ def discussion_list(request):
             'discussion': discussion,
             'other_participant': other_participant,
         })
-    return render(request, 'main/discussion_list.html', {'discussion_data': discussion_data})
+
+    return render(request, 'main/discussion_list.html', {
+        'discussion_data': discussion_data,
+        'users': users,
+        'query': query
+    })
+
 @login_required
 def search_users(request):
     query = request.GET.get('q', '')
     users = User.objects.filter(username__icontains=query).exclude(id=request.user.id)
-    return render(request, 'main/search_users.html', {'users': users, 'query': query})
+    return render(request, 'main/discussion_list.html', {
+        'users': users,
+        'query': query,
+        'discussion_data': []  # Empty discussion data to avoid breaking the template
+    })
+@login_required
+def start_discussion(request, user_id):
+    if request.user.id == user_id:
+        messages.error(request, 'لا يمكنك بدء مناقشة مع نفسك.')
+        return redirect('discussion_list')
+    other_user = get_object_or_404(User, id=user_id)
+    discussion = Discussion.objects.filter(
+        participants=request.user
+    ).filter(participants=other_user).first()
+
+    if not discussion:
+        discussion = Discussion.objects.create()
+        discussion.participants.add(request.user, other_user)
+    
+    return redirect('discussion_detail', discussion_id=discussion.id)

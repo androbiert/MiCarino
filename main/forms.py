@@ -18,7 +18,8 @@ class ProfileUpdateForm(forms.ModelForm):
 class MessageForm(forms.ModelForm):
     class Meta:
         model = Message
-        fields = ['content']
+        fields = ['content', 'image']
         widgets = {
-            'content': forms.Textarea(attrs={'class': 'form-control', 'rows': 3, 'placeholder': 'Write your message here...'}),
+            'content': forms.Textarea(attrs={'rows': 3, 'class': 'form-control', 'placeholder': 'اكتب رسالتك هنا...'}),
+            'image': forms.FileInput(attrs={'class': 'form-control-file'})
         }

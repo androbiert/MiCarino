@@ -46,12 +46,16 @@
             </div>
         </div>
     </nav>
-    <div class="container mt-3">
+
+<div class="container mt-3">
+    {% block flash_messages %}
         {% if messages %}
             {% for message in messages %}
                 <div class="alert {% if message.tags %}alert-{{ message.tags }}{% endif %}">{{ message }}</div>
             {% endfor %}
         {% endif %}
+    {% endblock %}
+</div>
 
         {% block content %}
         {% endblock %}
