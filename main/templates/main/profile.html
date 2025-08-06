@@ -1,0 +1,62 @@
+{% extends 'main/base.html' %}
+{% block content %}
+<div class="d-flex justify-content-center align-items-center" style="min-height: 80vh;">
+    <div class="card shadow-lg w-100 mx-3" style="max-width: 500px; border-radius: 20px; background: linear-gradient(43deg, #4158D0 0%, #C850C0 46%, #FFCC70 100%);">
+        <div class="card-body text-center p-4 text-white">
+            
+            <!-- Profile Image -->
+            <div class="position-relative mb-3">
+                <img src="{{ profile.image.url }}" alt="Profile Image" 
+                     class="rounded-circle border border-3 shadow-lg" 
+                     width="150" height="150">
+            </div>
+
+            <!-- Username -->
+            <h4 class="fw-bold mb-2">{{ profile_user.username }}</h4>
+            <p class="mb-4" style="color: #fff; font-size: 1.1rem;">{{ profile.bio|default:"لم يتم إضافة نبذة بعد" }}</p>
+
+            <!-- Form (only for profile owner) -->
+            {% if is_owner %}
+            <form method="POST" enctype="multipart/form-data" class="mt-3 text-end">
+                {% csrf_token %}
+                
+                <!-- Modern File Upload -->
+                <div class="mb-4">
+                    <label for="id_image" class="form-label fw-semibold d-block text-white">تغيير الصورة الشخصية</label>
+                    <input type="file" name="image" id="id_image" class="d-none" onchange="previewImage(event)">
+                    <label for="id_image" class="btn btn-outline-light mt-2 w-100" style="border-radius: 10px;">اختيار صورة</label>
+                    <div id="image-preview" class="mt-3 text-center"></div>
+                </div>
+
+                <!-- Deep Box Bio -->
+                <div class="mb-3">
+                    <label for="id_bio" class="form-label fw-semibold d-block text-white">نبذة عنك</label>
+                    <div class="bio-box">
+                        <textarea name="bio" id="id_bio" rows="3" class="form-control border-0 shadow-none bg-transparent text-end text-dark">{{ form.bio.value }}</textarea>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn-light btn-lg w-100 mt-3" style="border-radius: 10px; color: #6a0dad; font-weight: bold;">
+                    <i class="fas fa-save me-2"></i> تحديث الملف الشخصي
+                </button>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script>
+function previewImage(event) {
+    const preview = document.getElementById('image-preview');
+    const file = event.target.files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            preview.innerHTML = `<img src="${e.target.result}" 
+                                  class="rounded-circle shadow border border-2" width="120" height="120">`;
+        }
+        reader.readAsDataURL(file);
+    }
+}
+</script>
+{% endblock %}

@@ -1,4 +1,4 @@
-<!-- main/templates/main/base.html -->
+
  {% load static %}
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
@@ -25,8 +25,9 @@
                     </li>
                     {% if user.is_authenticated %}
                     <li class="nav-item">
-                        <a class="nav-link" href="{% url 'discussion' %}">المناقشة</a>
+                        <a class="nav-link" href="{% url 'discussion_list' %}">المناقشة</a>
                     </li>
+                    <li><a href="{% url 'view_profile' request.user.id %}" class="nav-link">الملف الشخصي</a></li>
                     <li class="nav-item">
                         <a class="nav-link" href="#creativity-corner">ركن الإبداع</a>
                     </li>
@@ -51,6 +52,7 @@
                 <div class="alert {% if message.tags %}alert-{{ message.tags }}{% endif %}">{{ message }}</div>
             {% endfor %}
         {% endif %}
+
         {% block content %}
         {% endblock %}
     </div>

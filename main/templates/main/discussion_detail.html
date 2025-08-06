@@ -1,0 +1,43 @@
+{% extends 'main/base.html' %}
+{% block content %}
+<div class="card shadow mx-auto" style="max-width: 600px; height: 80vh;">
+    <!-- Header -->
+    <div class="card-header d-flex align-items-center" style="background-color: #4b0082; color: #ffd700;">
+        {% with other=discussion.get_other_participant(request.user) %}
+        <img src="{{ other.profile.image.url }}" class="rounded-circle me-2" width="40" height="40">
+        <h5 class="mb-0">{{ other.username }}</h5>
+        {% endwith %}
+    </div>
+
+    <!-- Messages -->
+    <div class="card-body overflow-auto" style="background: #f5f5f5;" id="chat-box">
+        {% for msg in messages %}
+            <div class="mb-2 {% if msg.sender == request.user %}text-end{% else %}text-start{% endif %}">
+                <div class="d-inline-block p-2 rounded" { % if msg.sender == request.user %} style="background:  #6a0dad; color: #fff;{% else %}#fff; color: #000;">{% endif %}
+                    {% if msg.content %}<p class="mb-0">{{ msg.content }}</p>{% endif %}
+                    {% if msg.image %}<img src="{{ msg.image.url }}" class="chat-image mt-1">{% endif %}
+                    <small class="d-block mt-1 text-muted" style="font-size: 0.75rem;">{{ msg.timestamp|date:"H:i" }}</small>
+                </div>
+            </div>
+        {% empty %}
+            <p class="text-center text-muted">ابدأ المحادثة الآن</p>
+        {% endfor %}
+    </div>
+
+    <!-- Message Input -->
+    <div class="card-footer">
+        <form method="post" enctype="multipart/form-data" class="d-flex gap-2">
+            {% csrf_token %}
+            <input type="text" name="content" class="form-control" placeholder="اكتب رسالة..." />
+            <input type="file" name="image" class="form-control" />
+            <button type="submit" class="btn btn-love">إرسال</button>
+        </form>
+    </div>
+</div>
+
+<script>
+// Auto-scroll to bottom
+const chatBox = document.getElementById('chat-box');
+chatBox.scrollTop = chatBox.scrollHeight;
+</script>
+{% endblock %}

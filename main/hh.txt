@@ -1,0 +1,179 @@
+{% extends 'main/base.html' %}
+{% load static %}
+
+{% block content %}
+<!-- <div class="container py-5">
+    <div class="card p-4 mx-auto" style="max-width: 500px;">
+        <div class="text-center">
+            
+            <div class="position-relative d-inline-block mb-3">
+                {% if request.user.profile.image %}
+                    <img src="{{ request.user.profile.image.url }}" alt="Profile Image" class="rounded-circle" style="width: 120px; height: 120px; object-fit: cover; border: 2px solid #ffd700;">
+                {% else %}
+                    <img src="{% static 'images/default-profile.png' %}" alt="Default Profile Image" class="rounded-circle" style="width: 120px; height: 120px; object-fit: cover; border: 2px solid #ffd700;">
+                {% endif %}
+              
+                <button class="btn btn-sm position-absolute" style="bottom: 0; right: 0; background: #ffd700; color: #162447; border-radius: 50%; padding: 6px;" data-bs-toggle="modal" data-bs-target="#editProfileModal">
+                    <i class="fas fa-pen"></i>
+                </button>
+            </div>
+           
+            <h3 class="mb-3" style="color: #ffd700;">{{ request.user.username }}</h3>
+            
+            <p class="bio-box p-3 mb-0" style="font-weight: 700; font-size: 1.1rem; color: #f5f5f5;">
+                {{ request.user.profile.bio|default:"لم يتم إضافة نبذة بعد" }}
+            </p>
+        </div>
+    </div>
+</div> -->
+
+<!-- Edit Profile Modal -->
+<!-- <div class="modal fade" id="editProfileModal" tabindex="-1" aria-labelledby="editProfileModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="editProfileModalLabel">تعديل الملف الشخصي</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form method="post" enctype="multipart/form-data">
+                    {% csrf_token %}
+                  
+                    <div class="mb-3">
+                        <label for="profileImage" class="form-label">الصورة الشخصية</label>
+                        <div class="custom-file-upload p-3 text-center">
+                            <p>اسحب الصورة أو اضغط لاختيارها</p>
+                            {{ form.image }}
+                        </div>
+                    </div>
+                  
+                    <div class="mb-3">
+                        <label for="bio" class="form-label">نبذة عنك</label>
+                        <div class="bio-box">
+                            {{ form.bio }}
+                        </div>
+                    </div>
+                    <div class="text-center">
+                        <button type="submit" class="btn btn-love">تحديث</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div> -->
+<style>
+    /* Reset and global styles */
+
+
+/* Profile Card */
+.profile-card {
+    position: relative;
+    width: 300px;
+    height: 400px;
+    background: #ffffff;
+    border-radius: 20px;
+    overflow: hidden;
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
+    text-align: center;
+}
+
+/* Geometric Background Overlay */
+.background-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(135deg, #2c3e50 0%, #4b0082 100%);
+    opacity: 0.7;
+    z-index: 1;
+}
+
+/* Card Content */
+.card-content {
+    position: relative;
+    z-index: 2;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    height: 100%;
+}
+
+/* Profile Image */
+.profile-image {
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    border: 4px solid #ffd700;
+    object-fit: cover;
+    margin-bottom: 15px;
+}
+
+/* Username */
+.username {
+    font-size: 1.5rem;
+    color: #ffd700;
+    margin-bottom: 10px;
+}
+
+/* Bio */
+.bio {
+    font-size: 1.1rem;
+    color: #d3d3d3;
+    margin-bottom: 20px;
+    font-weight: 500;
+}
+
+/* Button Group */
+.button-group {
+    display: flex;
+    gap: 10px;
+}
+
+.btn {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 25px;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: transform 0.3s ease, background-color 0.3s ease;
+}
+
+.edit-btn {
+    background-color: #ffd700;
+    color: #162447;
+}
+
+.edit-btn:hover {
+    transform: translateY(-2px);
+    background-color: #e6c200;
+}
+
+.share-btn {
+    background-color: #162447;
+    color: #f5f5f5;
+}
+
+.share-btn:hover {
+    transform: translateY(-2px);
+    background-color: #1a2a4e;
+}
+</style>
+    <div class="profile-card">
+        <div class="background-overlay"></div>
+        <div class="card-content">
+            <img src="{{ request.user.profile.image.url }}" alt="Profile Image" class="profile-image">
+            <h2 class="username">Cameron Williamson</h2>
+            <p class="bio">مطور ويب</p>
+            <div class="button-group">
+                <button class="btn edit-btn">تعديل</button>
+                <button class="btn share-btn">مشاركة</button>
+            </div>
+        </div>
+    </div>
+
+
+<!-- Include Font Awesome for icons -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+{% endblock %}

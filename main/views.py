@@ -1,28 +1,54 @@
 # love_app/views.py
-from django.shortcuts import render, redirect
+from django.shortcuts import render, redirect , get_object_or_404
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
-from django.contrib.auth.forms import UserCreationForm
+from django.contrib.auth.forms import UserCreationForm 
 from django.contrib import messages
-from .models import Message
+from .models import Message,Discussion
 from .forms import MessageForm
+from django.contrib.auth.models import User
+from .forms import ProfileUpdateForm
+from django.db.models import Q
+
+
+
+
+from django.shortcuts import render, redirect
+from django.contrib.auth.decorators import login_required
+from django.contrib import messages
+from .forms import ProfileUpdateForm
+
+@login_required
+def view_profile(request, user_id):
+    profile_user = get_object_or_404(User, id=user_id)
+    if request.method == 'POST':
+        if request.user.id != user_id:
+            messages.error(request, 'لا يمكنك تحديث ملف شخصي لمستخدم آخر.')
+            return redirect('view_profile', user_id=user_id)
+        form = ProfileUpdateForm(request.POST, request.FILES, instance=profile_user.profile)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'تم تحديث الملف الشخصي بنجاح!')
+            return redirect('view_profile', user_id=user_id)
+        else:
+            messages.error(request, 'حدث خطأ أثناء تحديث الملف الشخصي.')
+    else:
+        form = ProfileUpdateForm(instance=profile_user.profile)
+    return render(request, 'main/profile.html', {
+        'form': form,
+        'profile': profile_user.profile,
+        'profile_user': profile_user,
+        'is_owner': request.user.id == user_id
+    })
+# @login_required
+# def view_profile(request, user_id):
+#     profile_user = get_object_or_404(User, id=user_id)
+#     return render(request, 'main/profile.html', {'profile_user': profile_user})
+
 
 def home(request):
     return render(request, 'main/home.html')
 
-@login_required
-def discussion(request):
-    if request.method == 'POST':
-        form = MessageForm(request.POST)
-        if form.is_valid():
-            message = form.save(commit=False)
-            message.sender = request.user
-            message.save()
-            return redirect('discussion')
-    else:
-        form = MessageForm()
-    messages_list = Message.objects.all().order_by('-timestamp')
-    return render(request, 'main/discussion.html', {'form': form, 'messages': messages_list})
 
 def login_view(request):
     if request.method == 'POST':
@@ -50,3 +76,57 @@ def register_view(request):
 def logout_view(request):
     logout(request)
     return redirect('home')
+
+
+@login_required
+def start_discussion(request, user_id):
+    other_user = get_object_or_404(User, id=user_id)
+    discussion = Discussion.objects.filter(
+        participants=request.user
+    ).filter(participants=other_user).first()
+
+    if not discussion:
+        discussion = Discussion.objects.create()
+        discussion.participants.add(request.user, other_user)
+    
+    return redirect('discussion_detail', discussion_id=discussion.id)
+
+
+@login_required
+def discussion_detail(request, discussion_id):
+    discussion = get_object_or_404(Discussion, id=discussion_id, participants=request.user)
+    messages = discussion.messages.order_by('timestamp')
+
+    if request.method == 'POST':
+        content = request.POST.get('content')
+        image = request.FILES.get('image')
+        Message.objects.create(
+            discussion=discussion,
+            sender=request.user,
+            content=content,
+            image=image
+        )
+        return redirect('discussion_detail', discussion_id=discussion_id)
+
+    return render(request, 'main/discussion_detail.html', {
+        'discussion': discussion,
+        'messages': messages
+    })
+
+
+@login_required
+def discussion_list(request):
+    discussions = Discussion.objects.filter(participants=request.user).prefetch_related('participants')
+    discussion_data = []
+    for discussion in discussions:
+        other_participant = discussion.get_other_participant(request.user)
+        discussion_data.append({
+            'discussion': discussion,
+            'other_participant': other_participant,
+        })
+    return render(request, 'main/discussion_list.html', {'discussion_data': discussion_data})
+@login_required
+def search_users(request):
+    query = request.GET.get('q', '')
+    users = User.objects.filter(username__icontains=query).exclude(id=request.user.id)
+    return render(request, 'main/search_users.html', {'users': users, 'query': query})

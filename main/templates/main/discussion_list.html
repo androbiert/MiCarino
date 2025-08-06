@@ -1,0 +1,33 @@
+{% extends 'main/base.html' %}
+{% block content %}
+
+    <h1>محادثاتي</h1>
+
+    <div class="container mt-4">
+        <div class="row">
+            {% for data in discussion_data %}
+                <div class="col-md-4 mb-3">
+                    <div class="card">
+                        <div class="card-body">
+                            <h5 class="card-title">
+                                <a href="{% url 'discussion_detail' data.discussion.id %}">
+                                    {{ data.other_participant.username }}
+                                </a>
+                            </h5>
+                            <p class="card-text">
+                                {% if data.discussion.messages.last %}
+                                    {{ data.discussion.messages.last.content|truncatewords:6 }}
+                                {% else %}
+                                    لا توجد رسائل بعد
+                                {% endif %}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            {% empty %}
+                <p>لا توجد مناقشات بعد.</p>
+            {% endfor %}
+        </div>
+    </div>
+
+{% endblock %}
