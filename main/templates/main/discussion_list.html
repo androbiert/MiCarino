@@ -15,20 +15,20 @@
 
     <!-- Search Results -->
     {% if users %}
-        <h3 class="mb-3">📜 نتائج البحث</h3>
+        <h3 class="mb-3 text-light">📜 نتائج البحث</h3>
         <div class="row">
             {% for user in users %}
                 {% if user.id %}
                     <div class="col-md-4 mb-3">
-                        <div class="card shadow border-0 rounded-4">
+                        <div class="card shadow border-0 rounded-4 chat-card">
                             <div class="card-body text-center">
                                 <a href="{% url 'view_profile' user_id=user.id %}">
                                     <img src="{{ user.profile.image.url|default:'/media/profile_images/default.png' }}" 
                                          alt="{{ user.username }}" 
-                                         class="rounded-circle shadow mb-2" 
+                                         class="rounded-circle shadow mb-2 profile-hover" 
                                          width="80" height="80">
                                 </a>
-                                <h5 class="card-title fw-bold">{{ user.username }}</h5>
+                                <h5 class="card-title fw-bold text-light">{{ user.username }}</h5>
                                 <a href="{% url 'start_discussion' user_id=user.id %}" 
                                    class="btn btn-love mt-2">بدء مناقشة</a>
                             </div>
@@ -39,49 +39,47 @@
                 {% endif %}
             {% endfor %}
             {% if not users %}
-                <p>❌ لا توجد نتائج للبحث.</p>
+                <p class="text-light">❌ لا توجد نتائج للبحث.</p>
             {% endif %}
         </div>
     {% endif %}
 
     <!-- Discussion List -->
-    <h3 class="mt-5 mb-3">💬 قائمة المناقشات</h3>
+    <h3 class="mt-5 mb-3 text-light">💬 قائمة المناقشات</h3>
     <div class="row">
         {% for data in discussion_data %}
             {% if data.other_participant and data.other_participant.id %}
                 <div class="col-md-4 mb-3">
-                    <div class="card shadow border-0 rounded-4">
-                        <div class="card-body d-flex align-items-center">
-                            <!-- Profile Image -->
-                            <a href="{% url 'view_profile' user_id=data.other_participant.id %}">
+                    <a href="{% url 'discussion_detail' data.discussion.id %}" 
+                       class="text-decoration-none" style="color: inherit;">
+                        <div class="card shadow border-0 rounded-4 chat-card">
+                            <div class="card-body d-flex align-items-center">
+                                <!-- Profile Image -->
                                 <img src="{{ data.other_participant.profile.image.url|default:'/media/profile_images/default.png' }}" 
                                      alt="{{ data.other_participant.username }}" 
-                                     class="rounded-circle me-3 shadow-sm border border-2" 
+                                     class="rounded-circle me-3 shadow-sm border border-2 profile-hover" 
                                      width="60" height="60">
-                            </a>
-                            
-                            <div>
-                                <!-- Username -->
-                                <h5 class="mb-1">
-                                    <a href="{% url 'discussion_detail' data.discussion.id %}" 
-                                       class="text-decoration-none text-dark fw-bold">
-                                       {{ data.other_participant.username }}
-                                    </a>
-                                </h5>
-                                <!-- Last message -->
-                                <p class="text-muted mb-0 small">
-                                    {% if data.discussion.messages.last %}
-                                        {{ data.discussion.messages.last.content|truncatewords:6 }}
-                                    {% else %}
-                                        لا توجد رسائل بعد
-                                    {% endif %}
-                                </p>
+                                
+                                <div>
+                                    <!-- Username -->
+                                    <h5 class="mb-1 fw-bold" style="color: #ffffff;">
+                                        {{ data.other_participant.username }}
+                                    </h5>
+                                    <!-- Last message -->
+                                    <p class="mb-0 small" style="color: rgba(255, 255, 255, 0.8);">
+                                        {% if data.discussion.messages.last %}
+                                            {{ data.discussion.messages.last.content|truncatewords:6 }}
+                                        {% else %}
+                                            لا توجد رسائل بعد
+                                        {% endif %}
+                                    </p>
+                                </div>
                             </div>
                         </div>
-                    </div>
+                    </a>
                 </div>
             {% else %}
-                <p class="text-muted">مناقشة غير صالحة</p>
+                <p class="text-light">مناقشة غير صالحة</p>
             {% endif %}
         {% endfor %}
         {% if not discussion_data %}
@@ -89,5 +87,22 @@
         {% endif %}
     </div>
 </div>
+
+<style>
+.chat-card {
+    background: rgba(255, 255, 255, 0.05);
+    transition: background 0.3s, transform 0.2s;
+}
+.chat-card:hover {
+    background: rgba(255, 255, 255, 0.15);
+    transform: translateY(-3px);
+}
+.profile-hover {
+    transition: box-shadow 0.3s;
+}
+.profile-hover:hover {
+    box-shadow: 0 0 10px rgba(255, 255, 255, 0.7);
+}
+</style>
 
 {% endblock %}

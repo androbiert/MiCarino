@@ -221,14 +221,22 @@ h1 {
   max-width: 70%;
   position: relative;
 }
+.chat-bubble::before {
+  content: '';
+  position: absolute;
+  width: 0;
+  height: 0;
+  border-style: solid;
+}
 .chat-message.me .chat-bubble {
   background-color: #9b4de4;
   color: white;
 }
+
 .chat-bubble small {
   display: block;
   text-align: right;
-  color: rgba(255,255,255,0.8);
+  color: rgba(59, 53, 53, 0.8);
   font-size: 0.75rem;
 }
 
@@ -286,3 +294,4 @@ h1 {
   height: 18px;
   fill: white;
 }
+

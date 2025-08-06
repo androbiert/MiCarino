@@ -2,50 +2,60 @@
 {% load static %}
 {% block flash_messages %}
 
-{% endblock %}
+    {% endblock %}
 {% block content %}
+<style>
+    .image-preview {
+    display: inline-block;
+    margin: 10px 0;
+}
+
+.image-preview img.chat-img-preview {
+    width: 100px;      /* Fixed width */
+    height: 100px;     /* Fixed height */
+    object-fit: cover; /* Crop to fit */
+    border-radius: 10px;
+    border: 1px solid #ccc;
+}
+</style>
+
 
 <div class="chat-container mx-auto mt-4">
-    <!-- Top Navigation -->
     <div class="chat-nav">
         <a>محادثة مع {{ other_participant.username }}</a>
+        <a href="{% url 'discussion_list' %}" class="chat-close-btn">
+            
         <div class="chat-close">
             <div class="chat-line one"></div>
             <div class="chat-line two"></div>
         </div>
     </div>
 
-    <!-- Messages Area -->
-    <div class="chat-messages">
+    <!-- Messages -->
+    <div class="chat-messages" id="chatMessages">
         {% for msg in messages %}
-        <div class="chat-message {% if msg.sender == request.user %}me{% else %}other{% endif %}">
-            <!-- Profile Image -->
+        <div class="chat-message {% if msg.sender == request.user %}me{% else %}other{% endif %}" data-message-id="{{ msg.id }}">
             <a href="{% url 'view_profile' msg.sender.id %}">
-                <img src="{{ msg.sender.profile.image.url }}" class="chat-avatar">
+                <img src="{{ msg.sender.profile.image.url|default:'/media/profile_images/default.png' }}" class="chat-avatar">
             </a>
-
-            <!-- Message Content -->
             <div class="chat-bubble">
-                {% if msg.content %}
-                    <p>{{ msg.content }}</p>
-                {% endif %}
-                {% if msg.image %}
-                    <img src="{{ msg.image.url }}" class="chat-img">
-                {% endif %}
-                <small>{{ msg.timestamp|date:"H:i" }}</small>
+                {% if msg.content %}<p>{{ msg.content }}</p>{% endif %}
+                {% if msg.image %}<img src="{{ msg.image.url }}" class="chat-img">{% endif %}
+                <small style="color: rgb(0, 0, 0);">{{ msg.timestamp|date:"H:i" }}</small>
             </div>
         </div>
         {% empty %}
-        <p class="text-center text-light mt-3">ابدأ المحادثة الآن</p>
+        <p class="text-center text-light mt-3" id="noMessages">ابدأ المحادثة الآن</p>
         {% endfor %}
     </div>
 
-    <!-- Sender Area -->
+    <!-- Sender -->
     <div class="chat-sender">
-        <form method="POST" enctype="multipart/form-data" class="chat-input-box">
+        <form id="messageForm" method="POST" enctype="multipart/form-data" class="chat-input-box">
             {% csrf_token %}
-            <input type="text" name="content" placeholder="اكتب رسالتك..." class="chat-input" >
-            <input type="file" name="image" class="chat-file">
+            <input type="text" name="content" id="messageInput" placeholder="اكتب رسالتك..." class="chat-input">
+            <input type="file" name="image" id="image-upload" class="chat-file d-none">
+            <label for="image-upload" class="chat-send attach"><i class="fas fa-image"></i></label>
             <button type="submit" class="chat-send">
                 <svg class="chat-send-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
                     <path fill="#fff" d="M481.5 210.3 68.4 38.9c-17.4-7.2-37.1-4-51.3 8.3C2.9 59.5-3.1 78.6 1.6 96.8L38.3 241h180c8.3 0 15 6.7 15 15s-6.7 15-15 15H38.3L1.6 415.2c-4.7 18.3 1.3 37.3 15.5 49.6 14.3 12.4 33.9 15.5 51.3 8.3l413.1-171.4c18.8-7.6 30.5-25.1 30.5-45.4 0-20.4-11.7-37.9-30.5-45.4z"/>
@@ -54,5 +64,90 @@
         </form>
     </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const chatMessages = document.getElementById('chatMessages');
+    const messageForm = document.getElementById('messageForm');
+    const messageInput = document.getElementById('messageInput');
+    const imageUpload = document.getElementById('image-upload');
+    const noMessages = document.getElementById('noMessages');
+    let lastMessageId = {{ messages.last.id|default:0 }};
+
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+
+    // Poll messages
+    function pollMessages() {
+        fetch(`/discussion/{{ discussion.id }}/messages/?last_id=${lastMessageId}`, {
+            headers: { 'X-CSRFToken': '{{ csrf_token }}' }
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.messages.length > 0) {
+                if (noMessages) noMessages.remove();
+                data.messages.forEach(msg => {
+                    const div = document.createElement('div');
+                    div.className = `chat-message ${msg.sender_id === {{ request.user.id }} ? 'me' : 'other'}`;
+                    div.setAttribute('data-message-id', msg.id);
+                    div.innerHTML = `
+                        <a href="/profile/${msg.sender_id}/">
+                            <img src="${msg.sender_profile_image}" class="chat-avatar">
+                        </a>
+                        <div class="chat-bubble">
+                            ${msg.content ? `<p>${msg.content}</p>` : ''}
+                            ${msg.image ? `<img src="${msg.image}" class="chat-img">` : ''}
+                            <small>${msg.timestamp}</small>
+                        </div>
+                    `;
+                    chatMessages.appendChild(div);
+                    lastMessageId = Math.max(lastMessageId, msg.id);
+                });
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            }
+        })
+        .catch(err => console.error(err));
+    }
+    setInterval(pollMessages, 3000);
+
+    // Send message
+    messageForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        const formData = new FormData(messageForm);
+
+        fetch(`/discussion/{{ discussion.id }}/`, {
+            method: 'POST',
+            headers: { 'X-Requested-With': 'XMLHttpRequest', 'X-CSRFToken': '{{ csrf_token }}' },
+            body: formData
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.status === 'success') {
+                // ✅ Clear inputs
+                messageInput.value = '';
+                imageUpload.value = '';
+                const preview = document.querySelector('.image-preview');
+                if (preview) preview.remove();
+                pollMessages();
+            }
+        })
+        .catch(err => console.error('Send error:', err));
+    });
+
+    // Image preview
+    imageUpload.addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = function(ev) {
+                const preview = document.createElement('div');
+                preview.className = 'image-preview';
+                preview.innerHTML = `<img src="${ev.target.result}" class="chat-img-preview">`;
+                messageForm.before(preview);
+            };
+            reader.readAsDataURL(file);
+        }
+    });
+});
+</script>
 
 {% endblock %}

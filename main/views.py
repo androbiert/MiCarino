@@ -164,3 +164,64 @@ def start_discussion(request, user_id):
         discussion.participants.add(request.user, other_user)
     
     return redirect('discussion_detail', discussion_id=discussion.id)
+
+from django.http import JsonResponse
+from django.template.loader import render_to_string
+from django.http import JsonResponse
+
+from django.http import JsonResponse
+
+@login_required
+def discussion_detail(request, discussion_id):
+    discussion = get_object_or_404(Discussion, id=discussion_id, participants=request.user)
+    messages = discussion.messages.order_by('timestamp')
+    other_participant = discussion.get_other_participant(request.user)
+
+    if request.method == 'POST':
+        form = MessageForm(request.POST, request.FILES)
+        if form.is_valid():
+            message = Message.objects.create(
+                discussion=discussion,
+                sender=request.user,
+                content=form.cleaned_data['content'],
+                image=form.cleaned_data['image']
+            )
+            # ✅ Return JSON for AJAX
+            if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+                return JsonResponse({
+                    'status': 'success',
+                    'message_id': message.id,
+                    'content': message.content,
+                    'image': message.image.url if message.image else None,
+                    'timestamp': message.timestamp.strftime("%H:%M"),
+                    'sender_id': message.sender.id,
+                    'sender_username': message.sender.username,
+                    'sender_profile_image': message.sender.profile.image.url if message.sender.profile.image else '/media/profile_images/default.png'
+                })
+            return redirect('discussion_detail', discussion_id=discussion_id)
+
+        if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+            return JsonResponse({'status': 'error', 'message': 'Invalid form'}, status=400)
+
+    return render(request, 'main/discussion_detail.html', {
+        'discussion': discussion,
+        'messages': messages,
+        'other_participant': other_participant
+    })
+
+
+@login_required
+def discussion_messages(request, discussion_id):
+    discussion = get_object_or_404(Discussion, id=discussion_id, participants=request.user)
+    last_id = request.GET.get('last_id', 0)
+    messages = discussion.messages.filter(id__gt=last_id).order_by('timestamp')
+    messages_data = [{
+        'id': msg.id,
+        'sender_id': msg.sender.id,
+        'sender_username': msg.sender.username,
+        'sender_profile_image': msg.sender.profile.image.url,
+        'content': msg.content,
+        'image': msg.image.url if msg.image else '',
+        'timestamp': msg.timestamp.strftime('%H:%M')
+    } for msg in messages]
+    return JsonResponse({'messages': messages_data})

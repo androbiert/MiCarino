@@ -1,0 +1,159 @@
+{% extends 'main/base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container mt-4" style="max-width: 800px;">
+    <h1 class="text-center mb-4">💌 محادثة مع {{ other_participant.username }}</h1>
+
+    <!-- Chat Messages -->
+    <div class="card mb-4" style="height: 60vh; overflow-y: auto; background: #f8f9fa;" id="chatMessages">
+        <div class="card-body p-3">
+            {% for msg in messages %}
+                <div class="d-flex mb-3 {% if msg.sender == request.user %}justify-content-end{% else %}justify-content-start{% endif %}" data-message-id="{{ msg.id }}">
+                    <!-- Profile Picture -->
+                    {% if msg.sender != request.user %}
+                        <img src="{{ msg.sender.profile.image.url|default:'/media/profile_images/default.png' }}" 
+                             alt="{{ msg.sender.username }}'s Profile" 
+                             class="rounded-circle me-2" 
+                             width="40" height="40">
+                    {% endif %}
+                    <div class="p-3 rounded {% if msg.sender == request.user %}bg-primary text-white{% else %}bg-secondary text-white{% endif %}" 
+                         style="max-width: 70%; border-radius: 15px;">
+                        {% if msg.content %}
+                            <p class="mb-1">{{ msg.content }}</p>
+                        {% endif %}
+                        {% if msg.image %}
+                            <img src="{{ msg.image.url }}" 
+                                 alt="Message Image" 
+                                 class="img-fluid rounded mb-1" 
+                                 style="max-width: 200px;">
+                        {% endif %}
+                        <small class="text-light opacity-75">{{ msg.timestamp|date:"H:i" }}</small>
+                    </div>
+                    {% if msg.sender == request.user %}
+                        <img src="{{ msg.sender.profile.image.url|default:'/media/profile_images/default.png' }}" 
+                             alt="{{ msg.sender.username }}'s Profile" 
+                             class="rounded-circle ms-2" 
+                             width="40" height="40">
+                    {% endif %}
+                </div>
+            {% empty %}
+                <p class="text-center text-muted" id="noMessages">ابدأ المحادثة الآن</p>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Message Input Form -->
+    <form id="messageForm" method="POST" enctype="multipart/form-data" class="d-flex align-items-center">
+        {% csrf_token %}
+        <div class="input-group">
+            <textarea name="content" id="messageInput" rows="1" class="form-control" 
+                     placeholder="اكتب رسالتك هنا..." style="border-radius: 20px 0 0 20px; resize: none;"></textarea>
+            <input type="file" name="image" id="image-upload" class="d-none">
+            <label for="image-upload" class="btn btn-outline-secondary" style="border-radius: 0;">
+                <i class="fas fa-image"></i>
+            </label>
+            <button type="submit" class="btn btn-love" style="border-radius: 0 20px 20px 0;">إرسال</button>
+        </div>
+    </form>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const chatMessages = document.getElementById('chatMessages');
+    const messageForm = document.getElementById('messageForm');
+    const messageInput = document.getElementById('messageInput');
+    const imageUpload = document.getElementById('image-upload');
+    const noMessages = document.getElementById('noMessages');
+    let lastMessageId = {{ messages.last.id|default:0 }};
+
+    // Auto-scroll to bottom
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+
+    // Poll for new messages every 3 seconds
+    function pollMessages() {
+        fetch(`/discussion/{{ discussion.id }}/messages/?last_id=${lastMessageId}`, {
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.messages.length > 0) {
+                if (noMessages) noMessages.remove();
+                data.messages.forEach(msg => {
+                    const div = document.createElement('div');
+                    div.className = `d-flex mb-3 ${msg.sender_id === {{ request.user.id }} ? 'justify-content-end' : 'justify-content-start'}`;
+                    div.setAttribute('data-message-id', msg.id);
+                    div.style.opacity = 0; // Fade-in effect
+                    div.innerHTML = `
+                        ${msg.sender_id !== {{ request.user.id }} ? `
+                            <img src="${msg.sender_profile_image}" alt="${msg.sender_username}'s Profile" class="rounded-circle me-2" width="40" height="40">
+                        ` : ''}
+                        <div class="p-3 rounded ${msg.sender_id === {{ request.user.id }} ? 'bg-primary text-white' : 'bg-secondary text-white'}" style="max-width: 70%; border-radius: 15px;">
+                            ${msg.content ? `<p class="mb-1">${msg.content}</p>` : ''}
+                            ${msg.image ? `<img src="${msg.image}" alt="Message Image" class="img-fluid rounded mb-1" style="max-width: 200px;">` : ''}
+                            <small class="text-light opacity-75">${msg.timestamp}</small>
+                        </div>
+                        ${msg.sender_id === {{ request.user.id }} ? `
+                            <img src="${msg.sender_profile_image}" alt="${msg.sender_username}'s Profile" class="rounded-circle ms-2" width="40" height="40">
+                        ` : ''}
+                    `;
+                    chatMessages.querySelector('.card-body').appendChild(div);
+                    setTimeout(() => div.style.opacity = 1, 100); // Fade-in animation
+                    lastMessageId = Math.max(lastMessageId, msg.id);
+                });
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            }
+        })
+        .catch(error => console.error('Error polling messages:', error));
+    }
+
+    // Start polling
+    setInterval(pollMessages, 3000);
+
+    // Handle form submission
+    messageForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        const formData = new FormData(messageForm);
+        fetch(`/discussion/{{ discussion.id }}/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}'
+            },
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                messageInput.value = '';
+                imageUpload.value = '';
+                const preview = document.querySelector('.image-preview');
+                if (preview) preview.remove(); // Remove image preview
+                pollMessages(); // Fetch new messages immediately
+            } else {
+                alert('خطأ في إرسال الرسالة: ' + (data.message || 'حاول مرة أخرى'));
+            }
+        })
+        .catch(error => console.error('Error sending message:', error));
+    });
+
+    // Image preview
+    imageUpload.addEventListener('change', function(event) {
+        const file = event.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const preview = document.createElement('div');
+                preview.className = 'image-preview';
+                preview.innerHTML = `<img src="${e.target.result}" class="img-fluid rounded mt-2" style="max-width: 100px;">`;
+                messageForm.before(preview);
+            };
+            reader.readAsDataURL(file);
+        }
+    });
+});
+
+</script>
+
+{% endblock %}

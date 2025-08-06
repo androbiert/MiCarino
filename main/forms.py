@@ -15,11 +15,24 @@ class ProfileUpdateForm(forms.ModelForm):
             'image': forms.FileInput(attrs={'class': 'w-full p-2'}),
         }
 
+class ProfileUpdateForm(forms.ModelForm):
+    class Meta:
+        model = Profile
+        fields = ['image', 'bio']
+
 class MessageForm(forms.ModelForm):
     class Meta:
         model = Message
         fields = ['content', 'image']
         widgets = {
-            'content': forms.Textarea(attrs={'rows': 3, 'class': 'form-control', 'placeholder': 'اكتب رسالتك هنا...'}),
-            'image': forms.FileInput(attrs={'class': 'form-control-file'})
+            'content': forms.Textarea(attrs={
+                'rows': 3,
+                'class': 'form-control',
+                'placeholder': 'اكتب رسالتك هنا...',
+                'style': 'border-radius: 20px 0 0 20px;'
+            }),
+            'image': forms.FileInput(attrs={
+                'class': 'd-none',
+                'id': 'image-upload'
+            })
         }
