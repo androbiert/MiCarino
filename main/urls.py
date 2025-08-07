@@ -17,5 +17,6 @@ urlpatterns = [
     path('about-developer/', views.about_developer, name='about_developer'),
     path('notifications/check/', views.check_new_messages, name='check_new_messages'),
     path('discussion/<int:discussion_id>/mark-read/', views.mark_messages_read, name='mark_messages_read'),
+    path('discussions/delete/<int:discussion_id>/', views.delete_discussion, name='delete_discussion'),
 
 ]

@@ -251,6 +251,22 @@ def discussion_messages(request, discussion_id):
 def about_developer(request):
     return render(request, 'main/about_developer.html')
 
+from django.shortcuts import get_object_or_404, redirect
+from django.contrib import messages
+from .models import Discussion
+
+@login_required
+def delete_discussion(request, discussion_id):
+    discussion = get_object_or_404(Discussion, id=discussion_id)
+
+    # Check if the user is part of the discussion
+    if request.user == discussion.user1 or request.user == discussion.user2:
+        discussion.delete()
+        messages.success(request, "تم حذف المناقشة بنجاح.")
+    else:
+        messages.error(request, "ليس لديك صلاحية لحذف هذه المناقشة.")
+
+    return redirect('discussion_list')
 
 
 @login_required

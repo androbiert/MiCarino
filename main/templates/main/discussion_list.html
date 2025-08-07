@@ -48,8 +48,10 @@
     <h3 class="mt-5 mb-3 text-light">💬 قائمة المناقشات</h3>
     <div class="row">
         {% for data in discussion_data %}
+        
             {% if data.other_participant and data.other_participant.id %}
                 <div class="col-md-4 mb-3">
+                    
                     <a href="{% url 'discussion_detail' data.discussion.id %}" 
                        class="text-decoration-none" style="color: inherit;">
                         <div class="card shadow border-0 rounded-4 chat-card">

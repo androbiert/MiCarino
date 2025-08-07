@@ -289,3 +289,8 @@ h1 {
   fill: white;
 }
 
+.btn-danger {
+    padding: 0.4em 0.6em;
+    font-size: 0.9em;
+    line-height: 1;
+}
