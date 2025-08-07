@@ -14,4 +14,8 @@ urlpatterns = [
     path('discussion/<int:discussion_id>/messages/', views.discussion_messages, name='discussion_messages'),
     path('discussion/start/<int:user_id>/', views.start_discussion, name='start_discussion'),
     path('search-users/', views.search_users, name='search_users'),
+    path('about-developer/', views.about_developer, name='about_developer'),
+    path('notifications/check/', views.check_new_messages, name='check_new_messages'),
+    path('discussion/<int:discussion_id>/mark-read/', views.mark_messages_read, name='mark_messages_read'),
+
 ]

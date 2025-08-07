@@ -30,6 +30,7 @@ class Message(models.Model):
     content = models.TextField(blank=True, null=True)
     image = models.ImageField(upload_to='chat_images/', blank=True, null=True)
     timestamp = models.DateTimeField(auto_now_add=True)
+    is_read = models.BooleanField(default=False)
 
     def __str__(self):
         return f"Message from {self.sender.username} at {self.timestamp}"

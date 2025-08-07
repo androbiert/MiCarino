@@ -221,13 +221,7 @@ h1 {
   max-width: 70%;
   position: relative;
 }
-.chat-bubble::before {
-  content: '';
-  position: absolute;
-  width: 0;
-  height: 0;
-  border-style: solid;
-}
+
 .chat-message.me .chat-bubble {
   background-color: #9b4de4;
   color: white;

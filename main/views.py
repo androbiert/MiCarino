@@ -171,9 +171,22 @@ from django.http import JsonResponse
 
 from django.http import JsonResponse
 
+from django.shortcuts import render, redirect, get_object_or_404
+from django.contrib.auth.decorators import login_required
+from django.http import JsonResponse
+from .models import Discussion, Message
+from .forms import MessageForm
+
 @login_required
 def discussion_detail(request, discussion_id):
     discussion = get_object_or_404(Discussion, id=discussion_id, participants=request.user)
+
+    # ✅ Mark all messages from other participants as read
+    Message.objects.filter(
+        discussion=discussion,
+        is_read=False
+    ).exclude(sender=request.user).update(is_read=True)
+
     messages = discussion.messages.order_by('timestamp')
     other_participant = discussion.get_other_participant(request.user)
 
@@ -186,7 +199,8 @@ def discussion_detail(request, discussion_id):
                 content=form.cleaned_data['content'],
                 image=form.cleaned_data['image']
             )
-            # ✅ Return JSON for AJAX
+
+            # ✅ If AJAX request → return JSON
             if request.headers.get('x-requested-with') == 'XMLHttpRequest':
                 return JsonResponse({
                     'status': 'success',
@@ -196,10 +210,17 @@ def discussion_detail(request, discussion_id):
                     'timestamp': message.timestamp.strftime("%H:%M"),
                     'sender_id': message.sender.id,
                     'sender_username': message.sender.username,
-                    'sender_profile_image': message.sender.profile.image.url if message.sender.profile.image else '/media/profile_images/default.png'
+                    'sender_profile_image': (
+                        message.sender.profile.image.url 
+                        if message.sender.profile.image 
+                        else '/media/profile_images/default.png'
+                    )
                 })
+
+            # ✅ If normal form submission → redirect
             return redirect('discussion_detail', discussion_id=discussion_id)
 
+        # Handle invalid form for AJAX
         if request.headers.get('x-requested-with') == 'XMLHttpRequest':
             return JsonResponse({'status': 'error', 'message': 'Invalid form'}, status=400)
 
@@ -208,6 +229,7 @@ def discussion_detail(request, discussion_id):
         'messages': messages,
         'other_participant': other_participant
     })
+
 
 
 @login_required
@@ -225,3 +247,27 @@ def discussion_messages(request, discussion_id):
         'timestamp': msg.timestamp.strftime('%H:%M')
     } for msg in messages]
     return JsonResponse({'messages': messages_data})
+
+def about_developer(request):
+    return render(request, 'main/about_developer.html')
+
+
+
+@login_required
+def check_new_messages(request):
+    count = Message.objects.filter(
+        discussion__participants=request.user,
+        is_read=False
+    ).exclude(sender=request.user).count()
+    return JsonResponse({'unread_count': count})
+
+@login_required
+def mark_messages_read(request, discussion_id):
+    discussion = get_object_or_404(Discussion, id=discussion_id, participants=request.user)
+
+    Message.objects.filter(
+        discussion=discussion,
+        is_read=False
+    ).exclude(sender=request.user).update(is_read=True)
+
+    return JsonResponse({'status': 'success'})

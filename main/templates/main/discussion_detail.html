@@ -42,6 +42,15 @@
                 {% if msg.content %}<p>{{ msg.content }}</p>{% endif %}
                 {% if msg.image %}<img src="{{ msg.image.url }}" class="chat-img">{% endif %}
                 <small style="color: rgb(0, 0, 0);">{{ msg.timestamp|date:"H:i" }}</small>
+                {% if msg.sender == request.user %}
+                    <small class="seen-indicator">
+                        {% if msg.is_read %}
+                            <span class="text-success">✓ مقروء</span>
+                        {% else %}
+                            <span class="text-muted">✓ مرسل</span>
+                        {% endif %}
+                    </small>
+                {% endif %}
             </div>
         </div>
         {% empty %}
@@ -147,6 +156,20 @@ document.addEventListener('DOMContentLoaded', function() {
             reader.readAsDataURL(file);
         }
     });
+});
+document.addEventListener('DOMContentLoaded', function() {
+    function markAsRead() {
+        fetch(`/discussion/{{ discussion.id }}/mark-read/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}',
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        });
+    }
+
+    // Call it every 3 seconds to mark any new messages as read
+    setInterval(markAsRead, 3000);
 });
 </script>
 
