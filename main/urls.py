@@ -18,5 +18,10 @@ urlpatterns = [
     path('notifications/check/', views.check_new_messages, name='check_new_messages'),
     path('discussion/<int:discussion_id>/mark-read/', views.mark_messages_read, name='mark_messages_read'),
     path('discussions/delete/<int:discussion_id>/', views.delete_discussion, name='delete_discussion'),
+    path('discussion/<int:discussion_id>/heartbeat/', views.discussion_heartbeat, name='discussion_heartbeat'),
+    path('message/<int:message_id>/toggle-like/', views.toggle_message_like, name='toggle_like'),
+    path('discussion/<int:discussion_id>/latest/', views.discussion_latest_messages, name='discussion_latest_messages'),
+
+
 
 ]

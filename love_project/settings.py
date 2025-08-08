@@ -114,12 +114,8 @@ MEDIA_ROOT = BASE_DIR / 'media'
 
 LANGUAGE_CODE = 'en-us'
 
-TIME_ZONE = 'UTC'
-
-USE_I18N = True
-
+TIME_ZONE = 'Africa/Algiers'  # or your correct timezone
 USE_TZ = True
-
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
@@ -130,3 +126,9 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# WEBPUSH_SETTINGS = {
+#     "VAPID_PUBLIC_KEY": "BP5Csh44sBGhInbkv4qJNfJcbDmbNt0_UQ2VpoaK5GhN4m5peqTNdo7rWryC8o4ayDEIYIeItNcL9vMQxAtUlS0",
+#     "VAPID_PRIVATE_KEY": "yoQZV4LVk5IIOpOuYYmdBqhLIB8hsaWFWfocR32CqvY",
+#     "VAPID_ADMIN_EMAIL": "androbiert@gmail.com"
+# }

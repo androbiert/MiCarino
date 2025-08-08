@@ -4,19 +4,16 @@ from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import UserCreationForm 
 from django.contrib import messages
-from .models import Message,Discussion
+from .models import Message,Discussion , DiscussionPresence
 from .forms import MessageForm
 from django.contrib.auth.models import User
-from .forms import ProfileUpdateForm
+from .forms import ProfileUpdateForm, MessageForm
 from django.db.models import Q
-
-
-
-
-from django.shortcuts import render, redirect
-from django.contrib.auth.decorators import login_required
-from django.contrib import messages
-from .forms import ProfileUpdateForm
+from django.http import JsonResponse
+from django.utils import timezone
+from datetime import timedelta
+from django.db.models import Max
+from django.views.decorators.http import require_POST
 
 @login_required
 def view_profile(request, user_id):
@@ -40,11 +37,6 @@ def view_profile(request, user_id):
         'profile_user': profile_user,
         'is_owner': request.user.id == user_id
     })
-# @login_required
-# def view_profile(request, user_id):
-#     profile_user = get_object_or_404(User, id=user_id)
-#     return render(request, 'main/profile.html', {'profile_user': profile_user})
-
 
 def home(request):
     return render(request, 'main/home.html')
@@ -92,31 +84,6 @@ def start_discussion(request, user_id):
     return redirect('discussion_detail', discussion_id=discussion.id)
 
 @login_required
-def discussion_detail(request, discussion_id):
-    discussion = get_object_or_404(Discussion, id=discussion_id, participants=request.user)
-    messages = discussion.messages.order_by('timestamp')
-    other_participant = discussion.get_other_participant(request.user)
-
-    if request.method == 'POST':
-        form = MessageForm(request.POST, request.FILES)
-        if form.is_valid():
-            Message.objects.create(
-                discussion=discussion,
-                sender=request.user,
-                content=form.cleaned_data['content'],
-                image=form.cleaned_data['image']
-            )
-            return redirect('discussion_detail', discussion_id=discussion_id)
-    else:
-        form = MessageForm()
-
-    return render(request, 'main/discussion_detail.html', {
-        'discussion': discussion,
-        'messages': messages,
-        'other_participant': other_participant,
-        'form': form
-    })
-@login_required
 def discussion_list(request):
     # Handle search query
     query = request.GET.get('q', '')
@@ -125,7 +92,8 @@ def discussion_list(request):
         users = User.objects.filter(username__icontains=query).exclude(id=request.user.id)
 
     # Fetch discussions
-    discussions = Discussion.objects.filter(participants=request.user).prefetch_related('participants')
+    discussions = Discussion.objects.filter(participants=request.user).prefetch_related('participants').annotate(last_message_time=Max('messages__timestamp')) \
+        .order_by('-last_message_time', '-created_at')
     discussion_data = []
     for discussion in discussions:
         other_participant = discussion.get_other_participant(request.user)
@@ -165,29 +133,31 @@ def start_discussion(request, user_id):
     
     return redirect('discussion_detail', discussion_id=discussion.id)
 
-from django.http import JsonResponse
-from django.template.loader import render_to_string
-from django.http import JsonResponse
 
-from django.http import JsonResponse
-
-from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib.auth.decorators import login_required
-from django.http import JsonResponse
-from .models import Discussion, Message
-from .forms import MessageForm
+HEARTBEAT_WINDOW = timedelta(seconds=5)  # if user seen in last 20s -> consider them "online" in this discussion
 
 @login_required
 def discussion_detail(request, discussion_id):
-    discussion = get_object_or_404(Discussion, id=discussion_id, participants=request.user)
+    discussion = Discussion.objects.filter(
+        id=discussion_id,
+        participants=request.user
+    ).first()
 
-    # ✅ Mark all messages from other participants as read
+    if not discussion:
+        messages.error(request, "المناقشة غير موجودة أو تم حذفها.")
+        return redirect('discussion_list')
+    # update presence immediately (user opened or refreshed page)
+    obj, _ = DiscussionPresence.objects.get_or_create(discussion=discussion, user=request.user)
+    obj.last_seen = timezone.now()
+    obj.save()
+
+    # mark unread messages from others as read (when user opens the page)
     Message.objects.filter(
         discussion=discussion,
         is_read=False
     ).exclude(sender=request.user).update(is_read=True)
 
-    messages = discussion.messages.order_by('timestamp')
+    messages_qs = discussion.messages.order_by('timestamp')
     other_participant = discussion.get_other_participant(request.user)
 
     if request.method == 'POST':
@@ -196,11 +166,19 @@ def discussion_detail(request, discussion_id):
             message = Message.objects.create(
                 discussion=discussion,
                 sender=request.user,
-                content=form.cleaned_data['content'],
-                image=form.cleaned_data['image']
+                content=form.cleaned_data.get('content', '').strip() or None,
+                image=form.cleaned_data.get('image')
             )
 
-            # ✅ If AJAX request → return JSON
+            # check if recipient is currently "present" (heartbeat)
+            recipient = other_participant
+            presence = DiscussionPresence.objects.filter(discussion=discussion, user=recipient).first()
+            if presence and timezone.now() - presence.last_seen <= HEARTBEAT_WINDOW:
+                # recipient is viewing -> mark as read immediately
+                message.is_read = True
+                message.save()
+
+            # If AJAX request -> return JSON (including is_read)
             if request.headers.get('x-requested-with') == 'XMLHttpRequest':
                 return JsonResponse({
                     'status': 'success',
@@ -212,60 +190,108 @@ def discussion_detail(request, discussion_id):
                     'sender_username': message.sender.username,
                     'sender_profile_image': (
                         message.sender.profile.image.url 
-                        if message.sender.profile.image 
+                        if getattr(message.sender, 'profile', None) and message.sender.profile.image 
                         else '/media/profile_images/default.png'
-                    )
+                    ),
+                    'is_read': message.is_read
                 })
 
-            # ✅ If normal form submission → redirect
             return redirect('discussion_detail', discussion_id=discussion_id)
 
-        # Handle invalid form for AJAX
         if request.headers.get('x-requested-with') == 'XMLHttpRequest':
             return JsonResponse({'status': 'error', 'message': 'Invalid form'}, status=400)
 
     return render(request, 'main/discussion_detail.html', {
         'discussion': discussion,
-        'messages': messages,
+        'messages': messages_qs,
         'other_participant': other_participant
     })
+
+@login_required
+def discussion_latest_messages(request, discussion_id):
+    discussion = get_object_or_404(Discussion, id=discussion_id, participants=request.user)
+    messages_qs = discussion.messages.order_by('-timestamp')[:10]
+    messages_data = []
+    for msg in reversed(messages_qs):  # reverse to get oldest first
+        messages_data.append({
+            'id': msg.id,
+            'sender_id': msg.sender.id,
+            'sender_username': msg.sender.username,
+            'sender_profile_image': (
+                msg.sender.profile.image.url
+                if getattr(msg.sender, 'profile', None) and msg.sender.profile.image
+                else '/media/profile_images/default.png'
+            ),
+            'content': msg.content,
+            'image': msg.image.url if msg.image else '',
+            'timestamp': msg.timestamp.strftime('%H:%M'),
+            'is_read': msg.is_read,
+            'likes_count': msg.likes_count(),
+            'liked_by_user': request.user in msg.liked_by.all(),
+        })
+    return JsonResponse({'messages': messages_data})
+
+@login_required
+@require_POST
+def toggle_message_like(request, message_id):
+    message = get_object_or_404(Message, id=message_id)
+    if request.user in message.liked_by.all():
+        message.liked_by.remove(request.user)
+        liked = False
+    else:
+        message.liked_by.add(request.user)
+        liked = True
+    return JsonResponse({
+    'likes_count': message.likes_count(),
+    'liked_by_user': request.user in message.liked_by.all()
+
+    })
+
+def about_developer(request):
+    return render(request, 'main/about_developer.html')
 
 
 
 @login_required
 def discussion_messages(request, discussion_id):
     discussion = get_object_or_404(Discussion, id=discussion_id, participants=request.user)
-    last_id = request.GET.get('last_id', 0)
-    messages = discussion.messages.filter(id__gt=last_id).order_by('timestamp')
-    messages_data = [{
-        'id': msg.id,
-        'sender_id': msg.sender.id,
-        'sender_username': msg.sender.username,
-        'sender_profile_image': msg.sender.profile.image.url,
-        'content': msg.content,
-        'image': msg.image.url if msg.image else '',
-        'timestamp': msg.timestamp.strftime('%H:%M')
-    } for msg in messages]
+    last_id = int(request.GET.get('last_id', 0))
+    messages_qs = discussion.messages.filter(id__gt=last_id).order_by('timestamp')
+    messages_data = []
+    for msg in messages_qs:
+        messages_data.append({
+            'id': msg.id,
+            'sender_id': msg.sender.id,
+            'sender_username': msg.sender.username,
+            'sender_profile_image': (
+                msg.sender.profile.image.url if getattr(msg.sender, 'profile', None) and msg.sender.profile.image else '/media/profile_images/default.png'
+            ),
+            'content': msg.content,
+            'image': msg.image.url if msg.image else '',
+            'timestamp': msg.timestamp.strftime('%H:%M'),
+            'is_read': msg.is_read
+        })
     return JsonResponse({'messages': messages_data})
 
-def about_developer(request):
-    return render(request, 'main/about_developer.html')
 
-from django.shortcuts import get_object_or_404, redirect
-from django.contrib import messages
-from .models import Discussion
+@login_required
+def discussion_heartbeat(request, discussion_id):
+    discussion = get_object_or_404(Discussion, id=discussion_id, participants=request.user)
+    obj, _ = DiscussionPresence.objects.get_or_create(discussion=discussion, user=request.user)
+    obj.last_seen = timezone.now()
+    obj.save()
+    return JsonResponse({'status': 'ok', 'last_seen': obj.last_seen.isoformat()})
+
 
 @login_required
 def delete_discussion(request, discussion_id):
     discussion = get_object_or_404(Discussion, id=discussion_id)
-
-    # Check if the user is part of the discussion
-    if request.user == discussion.user1 or request.user == discussion.user2:
+    # check membership properly (participants is M2M)
+    if request.user in discussion.participants.all():
         discussion.delete()
         messages.success(request, "تم حذف المناقشة بنجاح.")
     else:
         messages.error(request, "ليس لديك صلاحية لحذف هذه المناقشة.")
-
     return redirect('discussion_list')
 
 
@@ -287,3 +313,4 @@ def mark_messages_read(request, discussion_id):
     ).exclude(sender=request.user).update(is_read=True)
 
     return JsonResponse({'status': 'success'})
+

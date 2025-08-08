@@ -1,6 +1,50 @@
 {% extends 'main/base.html' %}
 {% block content %}
 
+<style>
+
+.chat-card {
+    background: #9b4de4;
+    transition: background 0.3s;
+}
+.chat-card:hover {
+    background: rgba(255, 255, 255, 0.15);
+}
+.profile-hover {
+    transition: box-shadow 0.3s;
+}
+.profile-hover:hover {
+    box-shadow: 0 0 10px rgba(255, 255, 255, 0.7);
+}
+.custom-dropdown .btn {
+    font-size: 1.2rem;
+    padding: 0.25rem 0.5rem;
+    background: rgba(255,255,255,0.1);
+    border: none;
+    transition: background 0.3s, transform 0.2s;
+}
+.custom-dropdown .btn:hover {
+    background: rgba(255,255,255,0.25);
+    transform: scale(1.1);
+}
+.custom-dropdown .dropdown-menu {
+    background: rgba(20, 20, 20, 0.95);
+    border: none;
+    z-index: 9999;
+    position: absolute;
+}
+.custom-dropdown .dropdown-item:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+.alert-error {
+    background-color: #ce150f;
+    color: #f5f5f5;
+    border: none;
+}
+.card {
+    overflow: visible !important;
+}
+</style>
 <div class="container mt-4">
     <h1 class="text-center mb-4">💌 محادثاتي</h1>
 
@@ -48,13 +92,37 @@
     <h3 class="mt-5 mb-3 text-light">💬 قائمة المناقشات</h3>
     <div class="row">
         {% for data in discussion_data %}
-        
             {% if data.other_participant and data.other_participant.id %}
                 <div class="col-md-4 mb-3">
-                    
-                    <a href="{% url 'discussion_detail' data.discussion.id %}" 
-                       class="text-decoration-none" style="color: inherit;">
-                        <div class="card shadow border-0 rounded-4 chat-card">
+                    <div class="card shadow border-0 rounded-4 chat-card position-relative">
+
+                        <!-- Options Dropdown -->
+                        <div class="dropdown position-absolute top-0 start-0 m-2 custom-dropdown">
+    <button class="btn btn-sm btn-outline-light rounded-circle shadow-sm" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+        ⋮
+    </button>
+    <ul class="dropdown-menu dropdown-menu-dark dropdown-menu-start shadow-lg rounded-3" >
+        <li class="dropdown-item  small ">
+            📅 أنشئت: {{ data.discussion.created_at|date:"Y-m-d H:i" }}
+        </li>
+        <li class="dropdown-item small">
+            👥 المشاركون: <br>
+            {{ data.other_participant.username }} و {{ request.user.username }}
+        </li>
+        <li>
+            <form method="POST" action="{% url 'delete_discussion' data.discussion.id %}" 
+                  onsubmit="return confirm('هل أنت متأكد أنك تريد حذف هذه المناقشة؟');">
+                {% csrf_token %}
+                <button type="submit" class="dropdown-item text-danger small">
+                    🗑 حذف
+                </button>
+            </form>
+        </li>
+    </ul>
+</div>
+
+
+                        <a href="{% url 'discussion_detail' data.discussion.id %}" class="text-decoration-none" style="color: inherit;">
                             <div class="card-body d-flex align-items-center">
                                 <!-- Profile Image -->
                                 <img src="{{ data.other_participant.profile.image.url|default:'/media/profile_images/default.png' }}" 
@@ -77,8 +145,8 @@
                                     </p>
                                 </div>
                             </div>
-                        </div>
-                    </a>
+                        </a>
+                    </div>
                 </div>
             {% else %}
                 <p class="text-light">مناقشة غير صالحة</p>
@@ -90,21 +158,6 @@
     </div>
 </div>
 
-<style>
-.chat-card {
-    background: rgba(255, 255, 255, 0.05);
-    transition: background 0.3s, transform 0.2s;
-}
-.chat-card:hover {
-    background: rgba(255, 255, 255, 0.15);
-    transform: translateY(-3px);
-}
-.profile-hover {
-    transition: box-shadow 0.3s;
-}
-.profile-hover:hover {
-    box-shadow: 0 0 10px rgba(255, 255, 255, 0.7);
-}
-</style>
+
 
 {% endblock %}

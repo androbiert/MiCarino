@@ -1,61 +1,100 @@
 {% extends 'main/base.html' %}
 {% load static %}
 {% block flash_messages %}
-
-    {% endblock %}
+{% endblock %}
 {% block content %}
 <style>
     .image-preview {
-    display: inline-block;
-    margin: 10px 0;
+        display: inline-block;
+        margin: 10px 0;
+    }
+    .image-preview img.chat-img-preview {
+        width: 100px;
+        height: 100px;
+        object-fit: cover;
+        border-radius: 10px;
+        border: 1px solid #ccc;
+    }
+.message-meta {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    margin-top: 4px;
+    font-size: 12px;
+    color: #555;
 }
 
-.image-preview img.chat-img-preview {
-    width: 100px;      /* Fixed width */
-    height: 100px;     /* Fixed height */
-    object-fit: cover; /* Crop to fit */
-    border-radius: 10px;
-    border: 1px solid #ccc;
+.message-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 2px;
+}
+
+.heart-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 16px;
+    color: rgba(128, 128, 128, 0.2); /* faint gray when not liked */
+    transition: transform 0.2s ease-in-out, color 0.2s;
+}
+
+.heart-btn.liked {
+    color: red; /* bright red when liked */
+    transform: scale(1.2);
+}
+
+.likes-count {
+    font-size: 12px;
+    color: #777;
 }
 </style>
-
 
 <div class="chat-container mx-auto mt-4">
     <div class="chat-nav">
         <a>محادثة مع {{ other_participant.username }}</a>
-        <a href="{% url 'discussion_list' %}" class="chat-close-btn">
-            
-        <div class="chat-close">
-            <div class="chat-line one"></div>
-            <div class="chat-line two"></div>
-        </div>
+        <a href="{% url 'discussion_list' %}" class="chat-close-btn"> 
+            <div class="chat-close">
+                <div class="chat-line one"></div>
+                <div class="chat-line two"></div>
+            </div>
+        </a>
     </div>
 
     <!-- Messages -->
     <div class="chat-messages" id="chatMessages">
-        {% for msg in messages %}
-        <div class="chat-message {% if msg.sender == request.user %}me{% else %}other{% endif %}" data-message-id="{{ msg.id }}">
-            <a href="{% url 'view_profile' msg.sender.id %}">
-                <img src="{{ msg.sender.profile.image.url|default:'/media/profile_images/default.png' }}" class="chat-avatar">
-            </a>
-            <div class="chat-bubble">
-                {% if msg.content %}<p>{{ msg.content }}</p>{% endif %}
-                {% if msg.image %}<img src="{{ msg.image.url }}" class="chat-img">{% endif %}
-                <small style="color: rgb(0, 0, 0);">{{ msg.timestamp|date:"H:i" }}</small>
-                {% if msg.sender == request.user %}
-                    <small class="seen-indicator">
-                        {% if msg.is_read %}
-                            <span class="text-success">✓ مقروء</span>
-                        {% else %}
-                            <span class="text-muted">✓ مرسل</span>
-                        {% endif %}
-                    </small>
-                {% endif %}
-            </div>
+{% for msg in messages %}
+<div class="chat-message {% if msg.sender == request.user %}me{% else %}other{% endif %}" data-message-id="{{ msg.id }}">
+    <a href="{% url 'view_profile' msg.sender.id %}">
+        <img src="{{ msg.sender.profile.image.url|default:'/media/profile_images/default.png' }}" class="chat-avatar">
+    </a>
+    <div class="chat-bubble">
+        {% if msg.content %}<p>{{ msg.content }}</p>{% endif %}
+        {% if msg.image %}<img src="{{ msg.image.url }}" class="chat-img">{% endif %}
+        <div class="message-meta">
+            <small style="color: rgb(0, 0, 0);">{{ msg.timestamp|date:"H:i" }}</small>
+            {% if msg.sender == request.user %}
+                <small class="seen-indicator">
+                    {% if msg.is_read %}
+                        <span class="text-success">✓ مقروء</span>
+                    {% else %}
+                        <span class="text-muted">✓ مرسل</span>
+                    {% endif %}
+                </small>
+            {% endif %}
         </div>
-        {% empty %}
-        <p class="text-center text-light mt-3" id="noMessages">ابدأ المحادثة الآن</p>
-        {% endfor %}
+    </div>
+    <div class="message-actions">
+        <button 
+            class="heart-btn {% if request.user in msg.liked_by.all %}liked{% endif %}" 
+            data-message-id="{{ msg.id }}">
+            ❤️
+        </button>
+        <span class="likes-count">{{ msg.likes_count|default:0 }}</span>
+    </div>
+</div>
+{% endfor %}
     </div>
 
     <!-- Sender -->
@@ -75,79 +114,183 @@
 </div>
 
 <script>
-document.addEventListener('DOMContentLoaded', function() {
+(function() {
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+    const csrftoken = getCookie('csrftoken');
+
     const chatMessages = document.getElementById('chatMessages');
     const messageForm = document.getElementById('messageForm');
     const messageInput = document.getElementById('messageInput');
     const imageUpload = document.getElementById('image-upload');
     const noMessages = document.getElementById('noMessages');
-    let lastMessageId = {{ messages.last.id|default:0 }};
 
-    chatMessages.scrollTop = chatMessages.scrollHeight;
+    let lastMessageId = {{ messages.last.id|default:"0" }};
+    const POLL_INTERVAL_MS = 2500;
+    const REFRESH_LAST_MESSAGES_MS = 4000;
+    const HEARTBEAT_INTERVAL_MS = 3000;
 
-    // Poll messages
-    function pollMessages() {
-        fetch(`/discussion/{{ discussion.id }}/messages/?last_id=${lastMessageId}`, {
-            headers: { 'X-CSRFToken': '{{ csrf_token }}' }
-        })
-        .then(res => res.json())
-        .then(data => {
-            if (data.messages.length > 0) {
+    function scrollBottom() {
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+    scrollBottom();
+
+    function escapeHtml(text) {
+        if (!text) return '';
+        return text.replace(/[&<>"']/g, m => ({
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#39;'
+        }[m]));
+    }
+
+    function createMessageHTML(msg) {
+        return `
+        <div class="chat-message ${msg.sender_id === {{ request.user.id }} ? 'me' : 'other'}" data-message-id="${msg.id}">
+            <a href="{% url 'view_profile' 0 %}".replace('0', msg.sender_id)>
+                <img src="${msg.sender_profile_image}" class="chat-avatar">
+            </a>
+            <div class="chat-bubble">
+                ${msg.content ? `<p>${escapeHtml(msg.content)}</p>` : ''}
+                ${msg.image ? `<img src="${msg.image}" class="chat-img">` : ''}
+                <div class="message-meta">
+                    <small style="color: rgb(0, 0, 0);">${msg.timestamp}</small>
+                    ${msg.sender_id === {{ request.user.id }} ? 
+                        `<small class="seen-indicator">${msg.is_read ? '<span class="text-success">✓ مقروء</span>' : '<span class="text-muted">✓ مرسل</span>'}</small>` 
+                        : ''}
+                </div>
+            </div>
+            <div class="message-actions">
+                <button 
+                    class="heart-btn ${msg.liked_by_user ? 'liked' : ''}" 
+                    data-message-id="${msg.id}">
+                    ❤️
+                </button>
+                <span class="likes-count">${msg.likes_count ?? 0}</span>
+            </div>
+        </div>`;
+    }
+
+    async function pollMessages() {
+        try {
+            const res = await fetch("{% url 'discussion_messages' discussion.id %}?last_id=" + lastMessageId, {
+                credentials: 'same-origin'
+            });
+            const data = await res.json();
+            if (Array.isArray(data.messages) && data.messages.length > 0) {
                 if (noMessages) noMessages.remove();
                 data.messages.forEach(msg => {
-                    const div = document.createElement('div');
-                    div.className = `chat-message ${msg.sender_id === {{ request.user.id }} ? 'me' : 'other'}`;
-                    div.setAttribute('data-message-id', msg.id);
-                    div.innerHTML = `
-                        <a href="/profile/${msg.sender_id}/">
-                            <img src="${msg.sender_profile_image}" class="chat-avatar">
-                        </a>
-                        <div class="chat-bubble">
-                            ${msg.content ? `<p>${msg.content}</p>` : ''}
-                            ${msg.image ? `<img src="${msg.image}" class="chat-img">` : ''}
-                            <small>${msg.timestamp}</small>
-                        </div>
-                    `;
-                    chatMessages.appendChild(div);
+                    const existing = chatMessages.querySelector(`[data-message-id="${msg.id}"]`);
+                    if (!existing) {
+                        chatMessages.insertAdjacentHTML('beforeend', createMessageHTML(msg));
+                    }
                     lastMessageId = Math.max(lastMessageId, msg.id);
                 });
-                chatMessages.scrollTop = chatMessages.scrollHeight;
+                scrollBottom();
             }
-        })
-        .catch(err => console.error(err));
+        } catch (err) {
+            console.error('poll error', err);
+        }
     }
-    setInterval(pollMessages, 3000);
 
-    // Send message
-    messageForm.addEventListener('submit', function(e) {
-        e.preventDefault();
-        const formData = new FormData(messageForm);
-
-        fetch(`/discussion/{{ discussion.id }}/`, {
-            method: 'POST',
-            headers: { 'X-Requested-With': 'XMLHttpRequest', 'X-CSRFToken': '{{ csrf_token }}' },
-            body: formData
-        })
-        .then(res => res.json())
-        .then(data => {
-            if (data.status === 'success') {
-                // ✅ Clear inputs
-                messageInput.value = '';
-                imageUpload.value = '';
-                const preview = document.querySelector('.image-preview');
-                if (preview) preview.remove();
-                pollMessages();
+    async function refreshLastMessages() {
+        try {
+            const res = await fetch("{% url 'discussion_latest_messages' discussion.id %}", {
+                credentials: 'same-origin'
+            });
+            const data = await res.json();
+            if (Array.isArray(data.messages)) {
+                data.messages.forEach(msg => {
+                    const el = chatMessages.querySelector(`[data-message-id="${msg.id}"]`);
+                    if (el) {
+                        // Update seen/sent
+                        const seenEl = el.querySelector(".seen-indicator");
+                        if (seenEl) {
+                            seenEl.innerHTML = msg.is_read 
+                                ? '<span class="text-success">✓ مقروء</span>' 
+                                : '<span class="text-muted">✓ مرسل</span>';
+                        }
+                        // Update likes
+                        const likeBtn = el.querySelector(".heart-btn");
+                        if (likeBtn) {
+                            likeBtn.classList.toggle("liked", msg.liked_by_user);
+                            likeBtn.nextElementSibling.textContent = msg.likes_count ?? 0;
+                        }
+                    }
+                });
             }
-        })
-        .catch(err => console.error('Send error:', err));
+        } catch (err) {
+            console.error('refresh error', err);
+        }
+    }
+
+    async function sendHeartbeat() {
+        await fetch("{% url 'discussion_heartbeat' discussion.id %}", {
+            method: 'POST',
+            headers: {'X-CSRFToken': csrftoken, 'X-Requested-With': 'XMLHttpRequest'},
+            credentials: 'same-origin'
+        }).catch(() => {});
+    }
+
+    async function markRead() {
+        await fetch("{% url 'mark_messages_read' discussion.id %}", {
+            method: 'POST',
+            headers: {'X-CSRFToken': csrftoken, 'X-Requested-With': 'XMLHttpRequest'},
+            credentials: 'same-origin'
+        }).catch(() => {});
+    }
+
+    messageForm.addEventListener('submit', async e => {
+        e.preventDefault();
+        if (!messageInput.value.trim() && !imageUpload.files.length) return;
+        const formData = new FormData(messageForm);
+        const res = await fetch("{% url 'discussion_detail' discussion.id %}", {
+            method: 'POST',
+            headers: {'X-Requested-With': 'XMLHttpRequest', 'X-CSRFToken': csrftoken},
+            body: formData,
+            credentials: 'same-origin'
+        });
+        const data = await res.json();
+        if (data.status === 'success') {
+            messageInput.value = '';
+            imageUpload.value = '';
+            document.querySelector('.image-preview')?.remove();
+            chatMessages.insertAdjacentHTML('beforeend', createMessageHTML({
+                id: data.message_id,
+                sender_id: data.sender_id,
+                sender_profile_image: data.sender_profile_image,
+                content: data.content,
+                image: data.image,
+                timestamp: data.timestamp,
+                is_read: data.is_read,
+                liked_by_user: false,
+                likes_count: 0
+            }));
+            scrollBottom();
+            lastMessageId = Math.max(lastMessageId, data.message_id);
+        }
     });
 
-    // Image preview
-    imageUpload.addEventListener('change', function(e) {
+    imageUpload.addEventListener('change', e => {
         const file = e.target.files[0];
         if (file) {
             const reader = new FileReader();
-            reader.onload = function(ev) {
+            reader.onload = ev => {
+                document.querySelector('.image-preview')?.remove();
                 const preview = document.createElement('div');
                 preview.className = 'image-preview';
                 preview.innerHTML = `<img src="${ev.target.result}" class="chat-img-preview">`;
@@ -156,21 +299,41 @@ document.addEventListener('DOMContentLoaded', function() {
             reader.readAsDataURL(file);
         }
     });
-});
-document.addEventListener('DOMContentLoaded', function() {
-    function markAsRead() {
-        fetch(`/discussion/{{ discussion.id }}/mark-read/`, {
-            method: 'POST',
-            headers: {
-                'X-CSRFToken': '{{ csrf_token }}',
-                'X-Requested-With': 'XMLHttpRequest'
-            }
-        });
-    }
 
-    // Call it every 3 seconds to mark any new messages as read
-    setInterval(markAsRead, 3000);
-});
+    document.addEventListener("click", e => {
+        if (e.target.classList.contains("heart-btn")) {
+            const btn = e.target;
+            const messageId = btn.dataset.messageId;
+            fetch("{% url 'toggle_like' 0 %}".replace('0', messageId), {
+                method: 'POST',
+                headers: {'X-CSRFToken': csrftoken, 'X-Requested-With': 'XMLHttpRequest'}
+            })
+            .then(res => res.json())
+            .then(data => {
+                btn.classList.toggle("liked", data.liked_by_user);
+                btn.nextElementSibling.textContent = data.likes_count ?? 0;
+            });
+        }
+    });
+
+    // Initial runs
+    pollMessages();
+    refreshLastMessages();
+    sendHeartbeat();
+    markRead();
+
+    // Intervals
+    setInterval(pollMessages, POLL_INTERVAL_MS);
+    setInterval(refreshLastMessages, REFRESH_LAST_MESSAGES_MS);
+    setInterval(sendHeartbeat, HEARTBEAT_INTERVAL_MS);
+    setInterval(markRead, HEARTBEAT_INTERVAL_MS);
+
+    window.addEventListener('beforeunload', () => {
+        navigator.sendBeacon("{% url 'discussion_heartbeat' discussion.id %}");
+    });
+})();
 </script>
 
+{% endblock %}
+{% block footer %}
 {% endblock %}
